@@ -1,0 +1,96 @@
+# This workflow will build a spring boot project with Gradle
+
+name: Build and Publish to Artifactory
+
+on:
+  workflow_dispatch:
+    inputs:
+      isProduction:
+        description: 'Ready to build: [Yes | No]'
+        required: true
+        default: 'Yes'
+#    branches: [ main ]
+#  pull_request:
+#    branches: [ main ]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  BASE_DIRECTORY: './'
+  server-id: projectrepo
+  server-username: ${{ secrets.ARTIFACTORY_CRED_USR }}
+  server-password: ${{ secrets.ARTIFACTORY_CRED_PAT }}
+  DOCKER_REGISTRY: "packages.aa.com/docker-dev/avip-prediction"
+  REPOSITORY_URL: "packages.aa.com"
+  REPOID: "mavenrepo"
+
+jobs:
+  #  Coverity-Scan:
+  #    runs-on: coverity # This should run on this self hosted runner only
+  #    steps:
+  #      - uses: actions/checkout@v2
+  #      - uses: actions/checkout@v2
+  #        with:
+  #          repository: AAInternal/coverity-action
+  #          ref: v1.0.0
+  #          token: "${{ secrets.AAINTERNAL_READONLY_PAT }}"
+  #          path: ./.github/actions/coverity-action
+  #      - name: Performing Analysis
+  #        uses: ./.github/actions/coverity-action
+  #        with:
+  #          stream: cn-feature-couponnotifications-orchestrator #The stream name as per Coverity Project
+  #          languages: java #Code Language with comma seperated
+  #          username: "${{ secrets.COVERITY_USR }}"
+  #          password: "${{ secrets.COVERITY_PWD }}"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
+        with:
+          repository: AAInternal/sonarscan
+          ref: refs/heads/master
+          token: ${{ secrets.AAINTERNAL_READONLY_PAT }}
+          path: ./.github/actions/sonarscan
+
+      - uses: actions/setup-java@v1
+        with:
+          java-version: 11
+
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v1.1.0
+        with:
+          version: 1.42.3
+
+      - name: Update Version and Build Name
+        run: |
+          echo "APPLICATION_VERSION=1.0.0" >> $GITHUB_ENV
+          echo "APPLICATION_NAME=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
+          chmod +x gradlew
+      - name: Build
+        run: |
+          ./mvnw clean deploy -PmavenUsername=${{ secrets.ARTIFACTORY_CRED_USR }} -PmavenPassword=${{ secrets.ARTIFACTORY_CRED_PAT }}
+#      - name: Configure JFrog CLI and publish docker image
+#        run: |
+#          docker login -u ${{ secrets.ARTIFACTORY_CRED_USR }} -p ${{ secrets.ARTIFACTORY_CRED_PAT }} $REPOSITORY_URL
+#          jfrog rt config --url=$JFROG_URL --user=${{ secrets.ARTIFACTORY_CRED_USR }} --access-token=${{ secrets.ARTIFACTORY_CRED_PAT }} --interactive=false
+#          jfrog rt c show
+#          echo "$DOCKER_REGISTRY/$APPLICATION_NAME:$APPLICATION_VERSION"
+#          jfrog rt docker-push $DOCKER_REGISTRY/$APPLICATION_NAME:$APPLICATION_VERSION docker-dev --build-name=$APPLICATION_NAME-docker --build-number=$APPLICATION_VERSION
+#          jfrog rt build-publish $APPLICATION_NAME-docker $APPLICATION_VERSION
+        env:
+          JFROG_URL: https://packages.aa.com/artifactory
+          JFROG_CLI_JCENTER_REMOTE_SERVER: Default-Server
+          JFROG_CLI_JCENTER_REMOTE_REPO: Jcenter.bintray-proxy
+          JFROG_CLI_OFFER_CONFIG: false
+
+#   - name: Sonarscan step
+#     id: sonarscan
+#      uses: ./.github/actions/sonarscan
+#      env:
+#          SONARSCAN_EVENT_OBSERVE_ACCESS:  ${{ secrets.SONARSCAN_EVENT_OBSERVE_ACCESS }}
+#          DEPLOYMENT_ID: "cn-feature-couponnotifications-orchestrator"
+#      with:
+#          sonarqube_token: "${{ secrets.SONARQUBE_TOKEN }}"
+#          projectKey: "cn-feature-couponnotifications-orchestrator"
+#          projectName: "cn-feature-couponnotifications-orchestrator"
