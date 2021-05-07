@@ -9,6 +9,6 @@ public class HelloController {
 
     @GetMapping
     public String greeting() {
-        return "AVP Predicting service.!";
+        return "AVP Predicting service.! - Version 1";
     }
 }
